@@ -1,0 +1,202 @@
+<!--
+Single-file responsive recipe website
+How to use:
+1. Save this file as `index.html`.
+2. Open in your browser to run locally.
+3. To publish free: push to GitHub and enable GitHub Pages or drag the file to Netlify Drop.
+
+Features:
+- Add recipes with title, cuisine, image URL, ingredients, steps
+- Stored in localStorage so your recipes persist in your browser
+- Export/Import recipes as JSON
+- Simple, mobile-friendly layout
+
+You asked: "lets code that.. really" — this file gives you a fully working starting site.
+-->
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Deliciousness By Sushma</title>
+  <style>
+    :root{--accent:#c04a4a;--muted:#666}
+    *{box-sizing:border-box}
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;line-height:1.4;margin:0;color:#222;background:#faf8f6}
+    header{background:linear-gradient(90deg,#fff 0,#fff0);padding:24px 18px 12px;border-bottom:1px solid #eee}
+    .container{max-width:980px;margin:20px auto;padding:0 18px}
+    h1{margin:0;font-size:1.6rem}
+    p.lead{color:var(--muted);margin:6px 0 0}
+    .controls{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    button{background:var(--accent);color:#fff;border:0;padding:8px 12px;border-radius:10px;cursor:pointer}
+    button.secondary{background:#fff;color:var(--accent);border:1px solid #f0cfcf}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-top:18px}
+    .card{background:#fff;border-radius:12px;box-shadow:0 6px 18px rgba(20,20,20,0.06);overflow:hidden}
+    .card img{width:100%;height:160px;object-fit:cover;display:block}
+    .card .body{padding:12px}
+    .card h3{margin:0 0 6px;font-size:1.05rem}
+    .meta{font-size:0.85rem;color:var(--muted);margin-bottom:8px}
+    .ingredients{font-size:0.95rem;margin:8px 0}
+    .recipe-full{background:#fff;padding:18px;border-radius:12px;box-shadow:0 6px 18px rgba(20,20,20,0.06);}
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;padding:18px}
+    .modal .panel{background:#fff;padding:14px;border-radius:12px;max-width:720px;width:100%;max-height:90vh;overflow:auto}
+    label{display:block;font-weight:600;margin-top:8px}
+    input[type=text],textarea,select{width:100%;padding:8px;border-radius:8px;border:1px solid #ddd;margin-top:6px}
+    textarea{min-height:90px}
+    footer{padding:20px;text-align:center;color:var(--muted);font-size:0.9rem;margin-top:30px}
+    .topbar{display:flex;gap:10px;align-items:center;justify-content:space-between}
+    .search{flex:1;margin-left:12px}
+    @media (max-width:600px){.topbar{flex-direction:column;align-items:flex-start}.controls{width:100%}}
+    .small{font-size:0.85rem;color:var(--muted)}
+    .tag{display:inline-block;background:#fff0;padding:6px 8px;border-radius:999px;border:1px solid #fdecec;margin-right:6px;font-weight:600;color:var(--accent)}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="topbar">
+        <div>
+          <h1><i>Deliciousness by Sushma</i></h1>
+          <p class="lead">Recipes I love — cooking, baking, and experiments across cuisines.</p>
+        </div>
+        <div class="controls">
+          <button id="btnAdd">Add Recipe</button>
+          <button id="btnExport" class="secondary">Export</button>
+          <button id="btnImport" class="secondary">Import</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <input id="search" class="search" placeholder="Search recipes, e.g., biryani or cake" style="padding:10px;border-radius:10px;border:1px solid #eee;width:100%">
+
+    <div id="list" class="grid" aria-live="polite"></div>
+
+    <div id="empty" style="margin-top:20px;color:var(--muted);display:none">No recipes yet — click <strong>Add Recipe</strong> to create one.</div>
+
+    <div id="detail" style="display:none;margin-top:18px"></div>
+
+    <footer>
+      Built for Seema • Save recipes locally. Publish by uploading this file to GitHub Pages or Netlify.
+    </footer>
+  </main>
+
+  <!-- Modal form -->
+  <div id="modal" class="modal" style="display:none">
+    <div class="panel">
+      <h2 id="modalTitle">Add Recipe</h2>
+      <label>Title <input id="title"></label>
+      <label>Cuisine <input id="cuisine"></label>
+      <label>Image URL <input id="image"></label>
+      <label>Ingredients (one per line) <textarea id="ingredients"></textarea></label>
+      <label>Steps (one per line) <textarea id="steps"></textarea></label>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button id="saveBtn">Save</button>
+        <button id="cancelBtn" class="secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <input id="fileInput" type="file" accept="application/json" style="display:none">
+
+  <script>
+    // Simple recipe manager using localStorage
+    const LS_KEY = 'seema_recipes_v1'
+    const dom = id => document.getElementById(id)
+    let recipes = JSON.parse(localStorage.getItem(LS_KEY) || 'null') || []
+
+    const sample = {
+      id: 'sample-biryani',
+      title: 'Hyderabadi Biryani (Sample)',
+      cuisine: 'Indian',
+      image: 'https://images.unsplash.com/photo-1604908177522-2f7d0d6b2e24?q=80&w=1200&auto=format&fit=crop&ixlib=rb-4.0.3&s=abc',
+      ingredients: ['Basmati rice','Marinated chicken','Onions','Yogurt','Spices','Ghee'],
+      steps: ['Marinate chicken','Parboil rice','Layer rice and chicken','Cook on low heat until done']
+    }
+
+    if(!recipes.length){recipes = [sample]; save()}
+
+    function save(){localStorage.setItem(LS_KEY, JSON.stringify(recipes))}
+
+    const listEl = dom('list'), detail = dom('detail'), empty = dom('empty')
+
+    function renderList(filter=''){
+      listEl.innerHTML = ''
+      const filtered = recipes.filter(r=> (r.title + ' ' + r.cuisine + ' ' + (r.ingredients||[]).join(' ')).toLowerCase().includes(filter.toLowerCase()))
+      if(!filtered.length){empty.style.display='block'} else {empty.style.display='none'}
+      filtered.forEach(r=>{
+        const card = document.createElement('article'); card.className='card'
+        card.innerHTML = `<img src="${r.image || 'https://via.placeholder.com/800x500?text=No+image'}" alt="${r.title}"><div class="body"><h3>${r.title}</h3><div class="meta">${r.cuisine || ''}</div><div class="small">${(r.ingredients||[]).slice(0,4).join(', ')}${(r.ingredients||[]).length>4? '...' : ''}</div></div>`
+        card.addEventListener('click',()=> showDetail(r.id))
+        listEl.appendChild(card)
+      })
+    }
+
+    function showDetail(id){
+      const r = recipes.find(x=>x.id===id)
+      if(!r) return
+      detail.style.display='block'
+      detail.innerHTML = `<div class="recipe-full"><div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap"><img src="${r.image||'https://via.placeholder.com/800x500?text=No+image'}" style="width:260px;border-radius:8px;object-fit:cover;height:180px"><div style="flex:1"><h2 style="margin-top:0">${r.title}</h2><div class="meta">${r.cuisine||''}</div><div style="margin-top:8px"><strong>Ingredients</strong><ul>${(r.ingredients||[]).map(i=>`<li>${escapeHtml(i)}</li>`).join('')}</ul><strong>Steps</strong><ol>${(r.steps||[]).map(s=>`<li>${escapeHtml(s)}</li>`).join('')}</ol></div><div style="margin-top:8px"><button onclick="editRecipe('${r.id}')">Edit</button> <button class="secondary" onclick="deleteRecipe('${r.id}')">Delete</button></div></div></div></div>`
+      window.scrollTo({top:0,behavior:'smooth'})
+    }
+
+    function escapeHtml(s){return (s+'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')}
+
+    // Add / Edit modal
+    const modal = dom('modal'), btnAdd = dom('btnAdd'), saveBtn = dom('saveBtn'), cancelBtn = dom('cancelBtn')
+    let editId = null
+    btnAdd.addEventListener('click',()=>openModal())
+    cancelBtn.addEventListener('click',()=>closeModal())
+
+    function openModal(recipe){
+      editId = recipe?.id || null
+      dom('modalTitle').innerText = editId? 'Edit Recipe' : 'Add Recipe'
+      dom('title').value = recipe?.title || ''
+      dom('cuisine').value = recipe?.cuisine || ''
+      dom('image').value = recipe?.image || ''
+      dom('ingredients').value = (recipe?.ingredients||[]).join('\n')
+      dom('steps').value = (recipe?.steps||[]).join('\n')
+      modal.style.display='flex'
+    }
+    function closeModal(){modal.style.display='none'}
+
+    saveBtn.addEventListener('click',()=>{
+      const title = dom('title').value.trim()
+      if(!title){alert('Please add a title');return}
+      const newR = {
+        id: editId || ('r_'+Date.now()),
+        title,
+        cuisine: dom('cuisine').value.trim(),
+        image: dom('image').value.trim(),
+        ingredients: dom('ingredients').value.split('\n').map(s=>s.trim()).filter(Boolean),
+        steps: dom('steps').value.split('\n').map(s=>s.trim()).filter(Boolean)
+      }
+      if(editId){recipes = recipes.map(r=> r.id===editId? newR : r)} else {recipes.unshift(newR)}
+      save(); renderList(dom('search').value); closeModal(); showDetail(newR.id)
+    })
+
+    // Edit / Delete exposed globally for simplicity
+    window.editRecipe = function(id){ const r = recipes.find(x=>x.id===id); if(r) openModal(r) }
+    window.deleteRecipe = function(id){ if(!confirm('Delete this recipe?')) return; recipes = recipes.filter(r=>r.id!==id); save(); renderList(dom('search').value); detail.style.display='none' }
+
+    // Export / Import
+    dom('btnExport').addEventListener('click',()=>{
+      const blob = new Blob([JSON.stringify(recipes, null, 2)],{type:'application/json'})
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a'); a.href=url; a.download='seema_recipes.json'; a.click(); URL.revokeObjectURL(url)
+    })
+    dom('btnImport').addEventListener('click',()=>dom('fileInput').click())
+    dom('fileInput').addEventListener('change', async (e)=>{
+      const f = e.target.files[0]; if(!f) return; const text = await f.text(); try{ const imported = JSON.parse(text); if(Array.isArray(imported)){recipes = imported; save(); renderList(dom('search').value); alert('Imported recipes'); } else alert('Invalid file'); }catch(err){alert('Failed to import: '+err.message)}
+    })
+
+    // Search
+    dom('search').addEventListener('input', e=> renderList(e.target.value))
+
+    // initial render
+    renderList()
+  </script>
+</body>
+</html>
